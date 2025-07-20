@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMS Route Planner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-image: linear-gradient(to top right, #f3f4f6, #e0e7ff);
+        }
+        .card {
+            background-color: rgba(255, 255, 255, 0.7);
+            -webkit-backdrop-filter: blur(10px); /* Safari support */
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.15);
+        }
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.2s;
+            cursor: pointer;
+            text-align: center;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .input-field {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 500;
+            z-index: 50;
+            display: none;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .toast-success {
+            background-color: #10b981;
+        }
+        .toast-error {
+            background-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">EMS Smart Route Planner</h1>
+            <p class="text-lg text-gray-600 mt-2">Optimizing emergency response with real-time routing and hospital capacity management.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Actions -->
+            <div class="lg:col-span-1 flex flex-col space-y-6">
+                <!-- Find Nearest Hospital Card -->
+                <div class="card">
+                    <div class="flex items-center mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <h2 class="text-xl font-bold">Find Nearest Hospital</h2>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="patientLocation" class="font-semibold">Patient Location</label>
+                            <select id="patientLocation" class="input-field"></select>
+                        </div>
+                        <button id="findRouteBtn" class="btn btn-primary w-full">Find Route</button>
+                    </div>
+                    <div id="routeResult" class="mt-4 hidden"></div>
+                </div>
+
+                <!-- Add Patient Card -->
+                <div class="card">
+                     <div class="flex items-center mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        <h2 class="text-xl font-bold">Add Patient to Queue</h2>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="patientId" class="font-semibold">Patient ID</label>
+                            <input type="text" id="patientId" class="input-field" placeholder="e.g., P123">
+                        </div>
+                        <div>
+                            <label for="newPatientLocation" class="font-semibold">Patient Location</label>
+                            <select id="newPatientLocation" class="input-field"></select>
+                        </div>
+                        <div>
+                            <label for="patientPriority" class="font-semibold">Priority</label>
+                            <select id="patientPriority" class="input-field">
+                                <option value="1">1 (High)</option>
+                                <option value="2">2 (Medium)</option>
+                                <option value="3">3 (Low)</option>
+                            </select>
+                        </div>
+                        <button id="addPatientBtn" class="btn btn-primary w-full">Add Patient</button>
+                    </div>
+                </div>
+
+                <!-- Update Traffic Card -->
+                <div class="card">
+                    <div class="flex items-center mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4h1.5m-1.5 0H10.5m0 0v2m0 0v2m0-2h1.5m-1.5 0H10.5m6.5-7l2.5-2.5m0 0l2.5 2.5M12 18v-2m0 0V8m0 10h1.5m-1.5 0H10.5" />
+                        </svg>
+                        <h2 class="text-xl font-bold">Update Live Traffic</h2>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="roadStart" class="font-semibold">Start Location</label>
+                            <select id="roadStart" class="input-field"></select>
+                        </div>
+                        <div>
+                            <label for="roadEnd" class="font-semibold">End Location</label>
+                            <select id="roadEnd" class="input-field"></select>
+                        </div>
+                        <div>
+                            <label for="trafficLevel" class="font-semibold">New Traffic Multiplier</label>
+                            <input type="number" id="trafficLevel" class="input-field" placeholder="e.g., 1.5" step="0.1" min="1">
+                        </div>
+                        <button id="updateTrafficBtn" class="btn btn-primary w-full">Update Traffic</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Data Display -->
+            <div class="lg:col-span-2">
+                <!-- Dispatch & Patients Card -->
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                            </svg>
+                            <h2 class="text-xl font-bold">Dispatch Queue</h2>
+                        </div>
+                        <button id="dispatchBtn" class="btn btn-primary">Dispatch All</button>
+                    </div>
+                    <div id="dispatchLog" class="space-y-2 text-sm h-48 overflow-y-auto bg-gray-100 p-3 rounded-md border">
+                        <p class="text-gray-500">Dispatch log will appear here...</p>
+                    </div>
+                    <h3 class="text-lg font-bold mt-6 mb-2">Pending Patients</h3>
+                    <div id="patientList" class="space-y-2">
+                        <p class="text-gray-500">No patients in the queue.</p>
+                    </div>
+                </div>
+
+                <!-- Database View Card -->
+                <div class="card">
+                    <div class="flex items-center mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                        </svg>
+                        <h2 class="text-xl font-bold">System Database</h2>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2">Hospitals</h3>
+                            <div id="hospitalList" class="space-y-2 h-64 overflow-y-auto pr-2"></div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2">Road Network</h3>
+                            <div id="roadList" class="space-y-2 h-64 overflow-y-auto pr-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        // --- Self-Contained Min-Heap Implementation ---
+        class MinHeap {
+            constructor(comparisonFunction) {
+                this.heap = [];
+                this.compare = comparisonFunction || ((a, b) => a - b);
+            }
+
+            push(element) {
+                this.heap.push(element);
+                this.bubbleUp(this.heap.length - 1);
+            }
+
+            pop() {
+                if (this.isEmpty()) {
+                    return undefined;
+                }
+                this.swap(0, this.heap.length - 1);
+                const popped = this.heap.pop();
+                if (!this.isEmpty()) {
+                    this.sinkDown(0);
+                }
+                return popped;
+            }
+
+            isEmpty() {
+                return this.heap.length === 0;
+            }
+
+            getParentIndex(i) {
+                return Math.floor((i - 1) / 2);
+            }
+
+            getLeftChildIndex(i) {
+                return 2 * i + 1;
+            }
+
+            getRightChildIndex(i) {
+                return 2 * i + 2;
+            }
+
+            swap(i, j) {
+                [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
+            }
+
+            bubbleUp(i) {
+                let parentIndex = this.getParentIndex(i);
+                while (i > 0 && this.compare(this.heap[i], this.heap[parentIndex]) < 0) {
+                    this.swap(i, parentIndex);
+                    i = parentIndex;
+                    parentIndex = this.getParentIndex(i);
+                }
+            }
+
+            sinkDown(i) {
+                let leftIndex = this.getLeftChildIndex(i);
+                let rightIndex = this.getRightChildIndex(i);
+                let smallest = i;
+
+                if (leftIndex < this.heap.length && this.compare(this.heap[leftIndex], this.heap[smallest]) < 0) {
+                    smallest = leftIndex;
+                }
+
+                if (rightIndex < this.heap.length && this.compare(this.heap[rightIndex], this.heap[smallest]) < 0) {
+                    smallest = rightIndex;
+                }
+
+                if (smallest !== i) {
+                    this.swap(i, smallest);
+                    this.sinkDown(smallest);
+                }
+            }
+        }
+
+        // --- Priority Queue Implementation using the self-contained MinHeap ---
+        class PriorityQueue {
+            constructor() {
+                this.elements = new MinHeap((a, b) => a[0] - b[0]);
+            }
+            push(priority, item) {
+                this.elements.push([priority, item]);
+            }
+            pop() {
+                const element = this.elements.pop();
+                return element ? element[1] : undefined;
+            }
+            isEmpty() {
+                return this.elements.isEmpty();
+            }
+        }
+
+        // --- Core Logic Ported from Python to JavaScript ---
+        class Node {
+            constructor(name, isHospital = false, capacity = 0) {
+                this.name = name;
+                this.isHospital = isHospital;
+                this.capacity = capacity;
+                this.initialCapacity = capacity;
+                this.neighbors = new Map(); // Use Map for better performance
+            }
+
+            addNeighbor(neighbor, distance, trafficLevel) {
+                this.neighbors.set(neighbor, { distance, trafficLevel });
+            }
+        }
+
+        class Patient {
+            constructor(id, location, priority) {
+                this.id = id;
+                this.location = location;
+                this.priority = priority;
+            }
+        }
+
+        class RoutePlanner {
+            constructor() {
+                this.nodes = new Map();
+                this.patients = [];
+                this.trafficData = new Map();
+            }
+
+            addNode(name, isHospital = false, capacity = 0) {
+                const node = new Node(name, isHospital, capacity);
+                this.nodes.set(name, node);
+                return node;
+            }
+
+            addRoad(start, end, distance, trafficLevel) {
+                if (this.nodes.has(start) && this.nodes.has(end)) {
+                    this.nodes.get(start).addNeighbor(end, distance, trafficLevel);
+                    this.nodes.get(end).addNeighbor(start, distance, trafficLevel);
+                }
+            }
+
+            heuristic(node1, node2) {
+                return 1; // Simple constant heuristic
+            }
+
+            aStarSearch(start, goal) {
+                const openSet = new PriorityQueue();
+                openSet.push(0, start);
+                
+                const cameFrom = new Map();
+                const gScore = new Map();
+                this.nodes.forEach(node => gScore.set(node.name, Infinity));
+                gScore.set(start, 0);
+
+                const fScore = new Map();
+                this.nodes.forEach(node => fScore.set(node.name, Infinity));
+                fScore.set(start, this.heuristic(start, goal));
+
+                while (!openSet.isEmpty()) {
+                    const current = openSet.pop();
+
+                    if (current === goal) {
+                        const path = [];
+                        let temp = current;
+                        while (cameFrom.has(temp)) {
+                            path.push(temp);
+                            temp = cameFrom.get(temp);
+                        }
+                        path.push(start);
+                        return { path: path.reverse(), score: fScore.get(goal) };
+                    }
+
+                    const currentNode = this.nodes.get(current);
+                    for (const [neighbor, { distance, trafficLevel }] of currentNode.neighbors.entries()) {
+                        const trafficKey = `${current},${neighbor}`;
+                        const trafficMultiplier = this.trafficData.has(trafficKey) ? this.trafficData.get(trafficKey) : trafficLevel;
+                        const tentativeGScore = gScore.get(current) + distance * trafficMultiplier;
+
+                        if (tentativeGScore < gScore.get(neighbor)) {
+                            cameFrom.set(neighbor, current);
+                            gScore.set(neighbor, tentativeGScore);
+                            fScore.set(neighbor, gScore.get(neighbor) + this.heuristic(neighbor, goal));
+                            openSet.push(fScore.get(neighbor), neighbor);
+                        }
+                    }
+                }
+                return { path: null, score: Infinity };
+            }
+            
+            calculateAdjustedTravelTime(route) {
+                let totalAdjustedTime = 0;
+                for (let i = 0; i < route.length - 1; i++) {
+                    const start = route[i];
+                    const end = route[i+1];
+                    const startNode = this.nodes.get(start);
+                    const {distance, trafficLevel} = startNode.neighbors.get(end);
+                    
+                    const trafficKey = `${start},${end}`;
+                    const trafficMultiplier = this.trafficData.has(trafficKey) ? this.trafficData.get(trafficKey) : trafficLevel;
+                    
+                    totalAdjustedTime += distance * trafficMultiplier;
+                }
+                return totalAdjustedTime;
+            }
+
+            findBestRoute(patientLocation) {
+                let minTime = Infinity;
+                let bestRoute = null;
+                let bestHospital = null;
+
+                for (const [hospitalName, hospital] of this.nodes.entries()) {
+                    if (hospital.isHospital && hospital.capacity > 0) {
+                        const { path } = this.aStarSearch(patientLocation, hospitalName);
+                        
+                        if (path) {
+                            const travelTime = this.calculateAdjustedTravelTime(path);
+                            if (travelTime < minTime) {
+                                minTime = travelTime;
+                                bestRoute = path;
+                                bestHospital = hospital;
+                            }
+                        }
+                    }
+                }
+
+                if (bestHospital) {
+                    bestHospital.capacity -= 1;
+                }
+                return { route: bestRoute, time: minTime, hospital: bestHospital };
+            }
+
+            dispatchEms() {
+                this.patients.sort((a, b) => a.priority - b.priority);
+                const dispatchResults = [];
+                
+                const remainingPatients = [];
+
+                this.patients.forEach(patient => {
+                    const { route, time, hospital } = this.findBestRoute(patient.location);
+                    if (route) {
+                        dispatchResults.push(`Dispatched for ${patient.id} at ${patient.location}. Route: ${route.join(' -> ')}. ETA: ${time.toFixed(1)} mins to ${hospital.name}.`);
+                    } else {
+                        dispatchResults.push(`No viable route/hospital for ${patient.id} at ${patient.location}. Patient remains in queue.`);
+                        remainingPatients.push(patient);
+                    }
+                });
+                
+                this.patients = remainingPatients;
+                return dispatchResults;
+            }
+
+            addPatient(id, location, priority) {
+                if (!id || !location || !priority) return {success: false, message: "Patient details are incomplete."};
+                if (!this.nodes.has(location)) return {success: false, message: `Location "${location}" does not exist.`};
+                
+                const patient = new Patient(id, location, parseInt(priority));
+                this.patients.push(patient);
+                return {success: true, message: `Patient ${id} added to the queue.`};
+            }
+
+            updateTrafficData(start, end, newTrafficLevel) {
+                 if (!this.nodes.has(start) || !this.nodes.has(end) || !this.nodes.get(start).neighbors.has(end)) {
+                    return {success: false, message: "This road does not exist."};
+                 }
+                 this.trafficData.set(`${start},${end}`, newTrafficLevel);
+                 this.trafficData.set(`${end},${start}`, newTrafficLevel);
+                 return {success: true, message: `Traffic updated for road between ${start} and ${end}.`};
+            }
+        }
+
+        // --- UI Logic ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const planner = new RoutePlanner();
+
+            // --- Initial Data Setup ---
+            function setupInitialData() {
+                // Coimbatore Hospitals
+                planner.addNode("Ganga Hospital", true, 10);
+                planner.addNode("Coimbatore Medical College Hospital", true, 12);
+                planner.addNode("PSG Hospitals", true, 8);
+                planner.addNode("KMCH (Kovai Medical Center and Hospital)", true, 9);
+                planner.addNode("Royal Care Hospital", true, 6);
+                planner.addNode("Lotus Eye Hospital", true, 5);
+                planner.addNode("K.G. Hospital", true, 9);
+                planner.addNode("Sankara Eye Hospital", true, 5);
+                planner.addNode("Sri Ramakrishna Hospital", true, 7);
+
+                // Tiruppur Hospitals
+                planner.addNode("Revathi Medical Center", true, 7);
+                planner.addNode("Aravind Eye Hospital Tiruppur", true, 5);
+                planner.addNode("Tiruppur Government Hospital", true, 10);
+                planner.addNode("Velan Hospital", true, 6);
+                planner.addNode("Mahalakshmi Hospital", true, 8);
+
+                // Erode Hospitals
+                planner.addNode("Erode Trust Hospital", true, 8);
+                planner.addNode("KMC Hospital Erode", true, 6);
+                planner.addNode("Shree Hospital", true, 5);
+                planner.addNode("Erode Government Hospital", true, 12);
+                planner.addNode("Arokya Hospital", true, 7);
+
+                // Salem Hospitals
+                planner.addNode("Vinayaka Missions Hospital", true, 11);
+                planner.addNode("SKS Hospital", true, 9);
+                planner.addNode("Salem Government Hospital", true, 15);
+                planner.addNode("Manipal Hospital Salem", true, 8);
+                planner.addNode("Sudar Hospital", true, 5);
+
+                // Coimbatore Locations
+                planner.addNode("Rathinapuri");
+                planner.addNode("Gandhipuram");
+                planner.addNode("Singanallur");
+                planner.addNode("Saravanampatti");
+                planner.addNode("Ukkadam");
+
+                // Tiruppur Locations
+                planner.addNode("Anupparpalayam");
+                planner.addNode("Palladam");
+                planner.addNode("Avinashi");
+                planner.addNode("Veerapandi");
+
+                // Erode Locations
+                planner.addNode("Perundurai");
+                planner.addNode("Kavindapadi");
+                planner.addNode("Bhavani");
+                planner.addNode("Gobichettipalayam");
+
+                // Salem Locations
+                planner.addNode("Ammapet");
+                planner.addNode("Fairlands");
+                planner.addNode("Hasthampatti");
+                planner.addNode("Suramangalam");
+
+                // Coimbatore Roads
+                planner.addRoad("Rathinapuri", "Ganga Hospital", 4, 1.1);
+                planner.addRoad("Gandhipuram", "Royal Care Hospital", 5, 1.0);
+                planner.addRoad("Singanallur", "Coimbatore Medical College Hospital", 6, 1.0);
+                planner.addRoad("Saravanampatti", "KMCH (Kovai Medical Center and Hospital)", 7, 1.3);
+                planner.addRoad("Ukkadam", "K.G. Hospital", 6, 1.1);
+                planner.addRoad("Royal Care Hospital", "KMCH (Kovai Medical Center and Hospital)", 11, 1.4);
+                planner.addRoad("Ganga Hospital", "K.G. Hospital", 6, 1.1);
+                planner.addRoad("PSG Hospitals", "Sri Ramakrishna Hospital", 5, 1.2);
+                planner.addRoad("Rathinapuri", "Sri Ramakrishna Hospital", 4, 1.2);
+                planner.addRoad("Gandhipuram", "PSG Hospitals", 5, 1.1);
+                planner.addRoad("Singanallur", "Lotus Eye Hospital", 8, 1.2);
+                planner.addRoad("Saravanampatti", "Sankara Eye Hospital", 9, 1.3);
+                planner.addRoad("Ukkadam", "Ganga Hospital", 6, 1.2);
+
+                // Tiruppur Roads
+                planner.addRoad("Revathi Medical Center", "Aravind Eye Hospital Tiruppur", 5, 1.2);
+                planner.addRoad("Tiruppur Government Hospital", "Velan Hospital", 3, 1.1);
+                planner.addRoad("Revathi Medical Center", "Mahalakshmi Hospital", 4, 1.3);
+                planner.addRoad("Tiruppur Government Hospital", "Palladam", 6, 1.2);
+                planner.addRoad("Aravind Eye Hospital Tiruppur", "Velan Hospital", 7, 1.1);
+                planner.addRoad("Anupparpalayam", "Revathi Medical Center", 5, 1.1);
+                planner.addRoad("Palladam", "Tiruppur Government Hospital", 4, 1.2);
+                planner.addRoad("Avinashi", "Aravind Eye Hospital Tiruppur", 6, 1.3);
+                planner.addRoad("Veerapandi", "Velan Hospital", 5, 1.1);
+                planner.addRoad("Palladam", "Mahalakshmi Hospital", 7, 1.0);
+
+                // Erode Roads
+                planner.addRoad("Erode Trust Hospital", "KMC Hospital Erode", 7, 1.1);
+                planner.addRoad("Shree Hospital", "Arokya Hospital", 3, 1.4);
+                planner.addRoad("Erode Government Hospital", "Perundurai", 5, 1.1);
+                planner.addRoad("KMC Hospital Erode", "Erode Government Hospital", 4, 1.2);
+                planner.addRoad("Perundurai", "Erode Trust Hospital", 6, 1.0);
+                planner.addRoad("Kavindapadi", "KMC Hospital Erode", 4, 1.2);
+                planner.addRoad("Bhavani", "Shree Hospital", 3, 1.3);
+                planner.addRoad("Gobichettipalayam", "Erode Government Hospital", 7, 1.2);
+
+                // Salem Roads
+                planner.addRoad("Vinayaka Missions Hospital", "SKS Hospital", 6, 1.1);
+                planner.addRoad("Salem Government Hospital", "Sudar Hospital", 5, 1.0);
+                planner.addRoad("Manipal Hospital Salem", "Fairlands", 7, 1.2);
+                planner.addRoad("SKS Hospital", "Sudar Hospital", 4, 1.1);
+                planner.addRoad("Ammapet", "Vinayaka Missions Hospital", 8, 1.2);
+                planner.addRoad("Fairlands", "SKS Hospital", 5, 1.1);
+                planner.addRoad("Hasthampatti", "Salem Government Hospital", 6, 1.0);
+                planner.addRoad("Suramangalam", "Manipal Hospital Salem", 6, 1.3);
+
+                // Inter-City Roads
+                planner.addRoad("Sri Ramakrishna Hospital", "Revathi Medical Center", 40, 1.6);
+                planner.addRoad("Sri Ramakrishna Hospital", "Erode Trust Hospital", 52, 1.4);
+                planner.addRoad("Revathi Medical Center", "Vinayaka Missions Hospital", 45, 1.5);
+                planner.addRoad("Erode Trust Hospital", "SKS Hospital", 48, 1.3);
+                planner.addRoad("Royal Care Hospital", "Revathi Medical Center", 42, 1.5);
+                planner.addRoad("KMCH (Kovai Medical Center and Hospital)", "Tiruppur Government Hospital", 30, 1.4);
+                planner.addRoad("PSG Hospitals", "Aravind Eye Hospital Tiruppur", 38, 1.3);
+                planner.addRoad("K.G. Hospital", "Vinayaka Missions Hospital", 50, 1.6);
+                planner.addRoad("Coimbatore Medical College Hospital", "Shree Hospital", 47, 1.2);
+            }
+            
+            // --- UI Update Functions ---
+            function updateUI() {
+                updateHospitalList();
+                updateRoadList();
+                updatePatientList();
+                populateDropdowns();
+            }
+
+            function updateHospitalList() {
+                const list = document.getElementById('hospitalList');
+                list.innerHTML = '';
+                planner.nodes.forEach(node => {
+                    if (node.isHospital) {
+                        const percentage = (node.capacity / node.initialCapacity) * 100;
+                        let bgColor = 'bg-green-200';
+                        if (percentage < 50) bgColor = 'bg-yellow-200';
+                        if (percentage < 25) bgColor = 'bg-red-200';
+
+                        const item = document.createElement('div');
+                        item.className = 'p-2 rounded-md border bg-gray-50';
+                        item.innerHTML = `
+                            <p class="font-semibold">${node.name}</p>
+                            <div class="flex justify-between items-center text-sm">
+                                <span>Capacity: ${node.capacity}/${node.initialCapacity}</span>
+                                <div class="w-1/2 bg-gray-200 rounded-full h-2.5">
+                                    <div class="${bgColor} h-2.5 rounded-full" style="width: ${percentage}%"></div>
+                                </div>
+                            </div>
+                        `;
+                        list.appendChild(item);
+                    }
+                });
+            }
+
+            function updateRoadList() {
+                const list = document.getElementById('roadList');
+                list.innerHTML = '';
+                const displayedRoads = new Set();
+                planner.nodes.forEach(startNode => {
+                    startNode.neighbors.forEach((data, endNodeName) => {
+                        const roadKey1 = `${startNode.name}-${endNodeName}`;
+                        const roadKey2 = `${endNodeName}-${startNode.name}`;
+                        if (!displayedRoads.has(roadKey1) && !displayedRoads.has(roadKey2)) {
+                            const trafficKey = `${startNode.name},${endNodeName}`;
+                            const currentTraffic = planner.trafficData.has(trafficKey) ? planner.trafficData.get(trafficKey) : data.trafficLevel;
+                            
+                            let trafficColor = 'text-green-600';
+                            if (currentTraffic >= 1.3) trafficColor = 'text-yellow-600';
+                            if (currentTraffic >= 1.6) trafficColor = 'text-red-600';
+
+                            const item = document.createElement('div');
+                            item.className = 'p-2 rounded-md border bg-gray-50 text-sm';
+                            item.innerHTML = `
+                                <p class="font-semibold">${startNode.name} ↔ ${endNodeName}</p>
+                                <div class="flex justify-between">
+                                    <span>Distance: ${data.distance} km</span>
+                                    <span class="${trafficColor}">Traffic: ${currentTraffic.toFixed(1)}x</span>
+                                </div>
+                            `;
+                            list.appendChild(item);
+                            displayedRoads.add(roadKey1);
+                        }
+                    });
+                });
+            }
+
+            function updatePatientList() {
+                const list = document.getElementById('patientList');
+                list.innerHTML = '';
+                if (planner.patients.length === 0) {
+                    list.innerHTML = '<p class="text-gray-500">No patients in the queue.</p>';
+                    return;
+                }
+                planner.patients.forEach(patient => {
+                    const item = document.createElement('div');
+                    item.className = 'p-3 rounded-md border bg-blue-50 flex justify-between items-center';
+                    item.innerHTML = `
+                        <div>
+                            <p class="font-bold">${patient.id}</p>
+                            <p class="text-sm text-gray-600">${patient.location}</p>
+                        </div>
+                        <span class="font-bold text-blue-600">Priority: ${patient.priority}</span>
+                    `;
+                    list.appendChild(item);
+                });
+            }
+            
+            function populateDropdowns() {
+                const allLocations = [...planner.nodes.keys()].sort();
+                const patientOnlyLocations = [...planner.nodes.values()]
+                    .filter(node => !node.isHospital)
+                    .map(node => node.name)
+                    .sort();
+
+                const patientSelects = [
+                    document.getElementById('patientLocation'),
+                    document.getElementById('newPatientLocation'),
+                ];
+
+                patientSelects.forEach(select => {
+                    const currentValue = select.value;
+                    select.innerHTML = '';
+                    patientOnlyLocations.forEach(loc => {
+                        const option = document.createElement('option');
+                        option.value = loc;
+                        option.textContent = loc;
+                        select.appendChild(option);
+                    });
+                    select.value = currentValue || (patientOnlyLocations.length > 0 ? patientOnlyLocations[0] : '');
+                });
+
+                const roadStartSelect = document.getElementById('roadStart');
+                const roadEndSelect = document.getElementById('roadEnd');
+
+                const currentStartValue = roadStartSelect.value;
+                roadStartSelect.innerHTML = '';
+
+                allLocations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc;
+                    option.textContent = loc;
+                    roadStartSelect.appendChild(option);
+                });
+                
+                roadStartSelect.value = currentStartValue || (allLocations.length > 0 ? allLocations[0] : '');
+
+                function updateRoadEndOptions() {
+                    const selectedStart = roadStartSelect.value;
+                    const startNode = planner.nodes.get(selectedStart);
+                    const currentEndValue = roadEndSelect.value;
+                    roadEndSelect.innerHTML = '';
+
+                    if (startNode && startNode.neighbors.size > 0) {
+                        const neighborNames = [...startNode.neighbors.keys()].sort();
+                        neighborNames.forEach(neighbor => {
+                            const option = document.createElement('option');
+                            option.value = neighbor;
+                            option.textContent = neighbor;
+                            roadEndSelect.appendChild(option);
+                        });
+                        if (neighborNames.includes(currentEndValue)) {
+                           roadEndSelect.value = currentEndValue;
+                        } else {
+                           roadEndSelect.value = neighborNames[0] || '';
+                        }
+                    }
+                }
+
+                roadStartSelect.addEventListener('change', updateRoadEndOptions);
+                updateRoadEndOptions(); // Initial population
+            }
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = type === 'success' ? 'toast-success' : 'toast-error';
+                toast.style.display = 'block';
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 3000);
+            }
+
+            // --- Event Listeners ---
+            document.getElementById('findRouteBtn').addEventListener('click', () => {
+                const location = document.getElementById('patientLocation').value;
+                
+                const tempPlanner = new RoutePlanner();
+                tempPlanner.nodes = new Map();
+                planner.nodes.forEach((value, key) => {
+                    const newNode = new Node(value.name, value.isHospital, value.capacity);
+                    newNode.initialCapacity = value.initialCapacity;
+                    value.neighbors.forEach((val, k) => {
+                        newNode.addNeighbor(k, val.distance, val.trafficLevel);
+                    });
+                    tempPlanner.nodes.set(key, newNode);
+                });
+                tempPlanner.trafficData = new Map(planner.trafficData);
+
+
+                const { route, time, hospital } = tempPlanner.findBestRoute(location);
+                const resultDiv = document.getElementById('routeResult');
+
+                if (route) {
+                    const origin = location.replace(/ /g, "+");
+                    const destination = hospital.name.replace(/ /g, "+");
+                    const url = `https://www.google.com/maps/dir/${origin}/${destination}`;
+                    
+                    resultDiv.innerHTML = `
+                        <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                            <h4 class="font-bold text-green-800">Optimal Route Found!</h4>
+                            <p><strong>To Hospital:</strong> ${hospital.name}</p>
+                            <p><strong>ETA:</strong> ${time.toFixed(1)} minutes</p>
+                            <p><strong>Route:</strong> ${route.join(' → ')}</p>
+                            <a href="${url}" target="_blank" class="inline-block mt-2 text-indigo-600 hover:underline font-semibold">Open in Google Maps</a>
+                        </div>
+                    `;
+                } else {
+                     resultDiv.innerHTML = `
+                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <h4 class="font-bold text-red-800">No Route Found</h4>
+                            <p>No available hospitals with capacity could be reached from this location.</p>
+                        </div>
+                    `;
+                }
+                resultDiv.classList.remove('hidden');
+            });
+
+            document.getElementById('addPatientBtn').addEventListener('click', () => {
+                const id = document.getElementById('patientId').value;
+                const location = document.getElementById('newPatientLocation').value;
+                const priority = document.getElementById('patientPriority').value;
+                
+                const result = planner.addPatient(id, location, priority);
+                showToast(result.message, result.success ? 'success' : 'error');
+
+                if(result.success) {
+                    document.getElementById('patientId').value = '';
+                    updatePatientList();
+                }
+            });
+
+            document.getElementById('updateTrafficBtn').addEventListener('click', () => {
+                const start = document.getElementById('roadStart').value;
+                const end = document.getElementById('roadEnd').value;
+                const level = parseFloat(document.getElementById('trafficLevel').value);
+
+                if (isNaN(level) || level < 1) {
+                    showToast('Please enter a valid traffic level (>= 1).', 'error');
+                    return;
+                }
+
+                const result = planner.updateTrafficData(start, end, level);
+                showToast(result.message, result.success ? 'success' : 'error');
+
+                if (result.success) {
+                    updateRoadList();
+                }
+            });
+
+            document.getElementById('dispatchBtn').addEventListener('click', () => {
+                const logDiv = document.getElementById('dispatchLog');
+                logDiv.innerHTML = '';
+
+                if (planner.patients.length === 0) {
+                    logDiv.innerHTML = '<p class="text-gray-500">No patients to dispatch.</p>';
+                    showToast('Dispatch queue is empty.', 'error');
+                    return;
+                }
+
+                const results = planner.dispatchEms();
+                results.forEach(res => {
+                    const p = document.createElement('p');
+                    p.className = 'p-2 rounded-md border ' + (res.startsWith('Dispatched') ? 'bg-green-100 border-green-200' : 'bg-yellow-100 border-yellow-200');
+                    p.textContent = res;
+                    logDiv.appendChild(p);
+                });
+                
+                showToast('Dispatch completed!', 'success');
+                updateUI();
+            });
+
+
+            // --- Initial Load ---
+            setupInitialData();
+            updateUI();
+        });
+    </script>
+</body>
+</html>
